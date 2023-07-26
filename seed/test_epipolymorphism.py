@@ -1,19 +1,55 @@
 import unittest
+import csv
+from ast import literal_eval
 
 from .epipolymorphism import get_quartets, load_cpgs
 
 
+with open('scratch/test.tsv') as f:
+    mock_read_table = csv.DictReader(f, delimiter='\t')
+    mock_read_hash = {}
+    for row in mock_read_table:
+        mock_read_hash[row['key']] = {
+            'query_name': row['query_name'],
+            'reference_start': int(row['reference_start']),
+            'reference_end': int(row['reference_end']),
+            'cigartuples': literal_eval(row['cigartuples']),
+            'xm_tag': row['xm_tag'],
+            'is_forward': row['is_forward'] == 'F',
+            'reference_name': row['reference_name']
+        }
+
+with open('scratch/desired.tsv') as f:
+    mock_quartet_table = csv.DictReader(f, delimiter='\t')
+    mock_quartet_hash = {}
+    for row in mock_quartet_table:
+        mock_quartet = tuple(
+            int(row['cpg%d_0' % (i+1)]) for i in range(4)
+        ) + tuple(
+            bool(int(row['meth%d' % (i+1)])) for i in range(4)
+        )
+        if row['key'] in mock_quartet_hash:
+            mock_quartet_hash[row['key']].append(mock_quartet)
+        else:
+            mock_quartet_hash[row['key']] = [mock_quartet]
+    mock_quartet_hash['no_quartets'] = []
+
+
 class MockRead:
-    def __init__(self, reference_start, xm_tag, cigartuples, reference_name,
-            reference_end):
-        self.reference_start = reference_start
-        self.reference_end = reference_end
-        self.xm_tag = xm_tag
-        self.cigartuples = cigartuples
-        self.reference_name = reference_name
+    def __init__(self, key):
+        mock_read = mock_read_hash[key]
+        self.reference_start = mock_read['reference_start']
+        self.reference_end = mock_read['reference_end']
+        self.xm_tag = mock_read['xm_tag']
+        self.cigartuples = mock_read['cigartuples']
+        self.reference_name = mock_read['reference_name']
+        self.orientation = mock_read['is_forward']
 
     def get_tag(self, tag='XM'):
         return self.xm_tag
+
+    def is_forward(self):
+        return self.orientation
 
 
 class TestLoadCpgs(unittest.TestCase):
@@ -24,19 +60,24 @@ class TestLoadCpgs(unittest.TestCase):
 
 
 class TestGetQuartets(unittest.TestCase):
-    def test_simple(self):
-        # D00796:32:C8BP4ANXX:6:2214:2710:17885_1:N:0:GGCTAC
-        read = MockRead(
-            reference_start=10588,
-            reference_end=10639,
-            xm_tag='Z....x....x.........Z.h..h.xZ.xZ....h.....Z.Z.xZ.Z.',
-            cigartuples=[(0, 51)],
-            reference_name='chr1'
-        )
-        cpgs = {
-            'chr1': [
-                5, 10588, 10608, 10616, 10619, 10630, 10632, 10635, 10637, 16243
-            ]
-        }
-        self.assertEqual(len(read.get_tag('XM')), 51)
+    @classmethod
+    def setUpClass(cls):
+        cls.cpgs = load_cpgs('scratch/bismark_CpG.txt')
 
+    def generic_read_test(self, key):
+        read = MockRead(key)        
+        quartets = get_quartets(read, self.cpgs)
+        expected_quartets = mock_quartet_hash[key]
+        self.assertEqual(quartets, expected_quartets)
+
+    def test_simple(self):
+        self.generic_read_test('simple')
+
+    def test_insertion(self):
+        self.generic_read_test('insertion')
+
+    def test_deletion(self):
+        self.generic_read_test('deletion')
+
+    def test_no_quartets(self):
+        self.generic_read_test('no_quartets')

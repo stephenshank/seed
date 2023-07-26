@@ -53,36 +53,40 @@ def print_relevant_read_info(read):
 
 
 def get_quartets(read, cpgs):
-    pass
-#    #print('cpgs: ', cpgs)
-#    position = datum['reference_start']
-#    #print('position: ', position)
-#    bases = list(cpgs.base - position - 1)
-#    #print('bases: ', bases, type(bases))
-#    meths = []
-#    base_index = 0
-#    xm_tag_index = 0
-#    ct_offset = 0
-#    #print('xm tag enumerated:')
-#    #for i, x in enumerate(xm_tag):
-#    #    print(i, x)
-#    dummy = ''
-#    for ct in datum['cigartuples']:
-#        #print(ct)
-#        is_match = ct[0] == 0
-#        is_insertion = ct[0] == 1
-#        is_deletion = ct[0] == 2
-#        if is_match:
-#            dummy += xm_tag[ct_offset: ct_offset+ct[1]]
-#            ct_offset += ct[1]
-#        elif is_insertion:
-#            ct_offset += ct[1]
-#        elif is_deletion:
-#            dummy += 'o'*ct[1]
-#        else:
-#            pass
-#    print([dummy[base] for base in bases])
-#    return None
+    strand = 'F' if read.is_forward() else 'R'
+    cpgs_on_chromosome = cpgs[read.reference_name][strand]
+    cpg_start = bisect_left(cpgs_on_chromosome, read.reference_start)
+    cpg_end = bisect_right(cpgs_on_chromosome, read.reference_end)
+    bases = [
+        cpg - read.reference_start
+        for cpg in cpgs_on_chromosome[cpg_start: cpg_end]
+    ]
+    ct_offset = 0
+    matches = ''
+    xm_tag = read.get_tag('XM')
+    for ct in read.cigartuples:
+        is_match = ct[0] == 0
+        is_insertion = ct[0] == 1
+        is_deletion = ct[0] == 2
+        if is_match:
+            matches += xm_tag[ct_offset: ct_offset+ct[1]]
+            ct_offset += ct[1]
+        elif is_insertion:
+            ct_offset += ct[1]
+        elif is_deletion:
+            matches += 'o'*ct[1]
+        else:
+            sys.stderr.write('no logic for %s!' % read.query_name)
+    quartets = []
+    indices = range(4)
+    for i in range(len(bases) - 3):
+        quartet = tuple(
+            bases[i + j] + read.reference_start for j in indices
+        ) + tuple(
+            matches[bases[i + j]] == 'Z' for j in indices
+        )
+        quartets.append(quartet)
+    return quartets
 
 
 def merge_quartets(all_quartets, quartets):
