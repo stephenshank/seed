@@ -53,7 +53,7 @@ def print_relevant_read_info(read):
 
 
 def get_quartets(read, cpgs):
-    strand = 'F' if read.is_forward() else 'R'
+    strand = 'F' if read.is_forward else 'R'
     cpgs_on_chromosome = cpgs[read.reference_name][strand]
     cpg_start = bisect_left(cpgs_on_chromosome, read.reference_start)
     cpg_end = bisect_right(cpgs_on_chromosome, read.reference_end)

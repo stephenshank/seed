@@ -43,13 +43,10 @@ class MockRead:
         self.xm_tag = mock_read['xm_tag']
         self.cigartuples = mock_read['cigartuples']
         self.reference_name = mock_read['reference_name']
-        self.orientation = mock_read['is_forward']
+        self.is_forward = mock_read['is_forward']
 
     def get_tag(self, tag='XM'):
         return self.xm_tag
-
-    def is_forward(self):
-        return self.orientation
 
 
 class TestLoadCpgs(unittest.TestCase):
