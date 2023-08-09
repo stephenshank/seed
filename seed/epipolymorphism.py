@@ -1,6 +1,7 @@
 import sys
 import json
 import argparse
+import itertools as it
 from bisect import bisect_left, bisect_right
 
 import pysam
@@ -93,25 +94,67 @@ def get_quartets(read, cpgs):
 
 
 def merge_quartets(all_quartets, quartets):
-    pass
+    for quartet in quartets:
+        positions = quartet[:4]
+        methylation = quartet[4:]
+        if positions in all_quartets:
+            if methylation in all_quartets[positions]:
+                all_quartets[positions][methylation] += 1
+            else:
+                all_quartets[positions][methylation] = 1
+        else:
+            all_quartets[positions] = {
+                methylation: 1
+            }
 
 
-def write_quartets(all_quartets, output_bed):
-    pass
+def write_quartets(chromosome, all_quartets, output_tsv_file):
+    all_methylation = list(
+        it.product((False, True), (False, True), (False, True), (False, True))
+    )
+    for position in all_quartets.keys(): 
+        row_start = [chromosome] + [str(i) for i in position]
+        row_end = []
+        for methylation in all_methylation:
+            if methylation in all_quartets[position]:
+                row_end.append(str(all_quartets[position][methylation]))
+            else:
+                row_end.append('0')
+        output_tsv_file.write('\t'.join(row_start + row_end) + '\n')
 
 
-def run_epipolymorphism(input_bam, input_cpgs, output_bed, loglevel=0):
+def run_epipolymorphism(input_bam, input_cpgs, output_tsv_path, loglevel=0):
     bam = pysam.AlignmentFile(input_bam, 'rb')
+    output_tsv_file = open(output_tsv_path, 'w')
+    all_methylation = list(
+        it.product((False, True), (False, True), (False, True), (False, True))
+    )
+    header = '\t'.join([
+        'chromosome', 'cpg1_0', 'cpg2_0', 'cpg3_0', 'cpg4_0'
+    ] + [
+        ''.join([
+            'Z' if meth_base else 'z' for meth_base in methylation
+        ])
+        for methylation in all_methylation
+    ]) + '\n'
+    output_tsv_file.write(header)
     cpgs = load_cpgs(input_cpgs)
     all_quartets = {}
     if loglevel > 0:
         print_header()
+    previous_chromosome = None
     for read in bam.fetch():
+        chromosome = read.reference_name
         if loglevel > 0:
             print_relevant_read_info(read)
         quartets = get_quartets(read, cpgs)
         merge_quartets(all_quartets, quartets)
-    write_quartets(all_quartets, output_bed)
+        if previous_chromosome != chromosome:
+            write_quartets(chromosome, all_quartets, output_tsv_file)
+            all_quartets = {}
+        previous_chromosome = chromosome
+    write_quartets(chromosome, all_quartets, output_tsv_file)
+    output_tsv_file.close()
 
 
 def cli():
