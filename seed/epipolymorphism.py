@@ -11,16 +11,19 @@ def load_cpgs(input_cpgs, output_cpgs=None):
     _ = next(cpg_table)
     cpg_hash = {}
     for line in cpg_table:
-        _, chr, pos1, strand, _, _, _ = line.split('\t')
+        _, chromosome, pos1, strand, _, _, _ = line.split('\t')
         pos0 = int(pos1) - 1
-        if chr in cpg_hash:
-            if strand in cpg_hash[chr]:
-                cpg_hash[chr][strand].append(pos0)
+        if chromosome in cpg_hash:
+            if strand in cpg_hash[chromosome]:
+                cpg_hash[chromosome][strand].append(pos0)
             else:
-                cpg_hash[chr][strand] = [pos0]
+                cpg_hash[chromosome][strand] = [pos0]
         else:
-            cpg_hash[chr] = {strand: [pos0]}
+            cpg_hash[chromosome] = {strand: [pos0]}
     cpg_table.close()
+    for chromosome in cpg_hash.keys():
+        for strand in cpg_hash[chromosome].keys():
+            cpg_hash[chromosome][strand].sort()
     if output_cpgs:
         with open(output_cpgs, 'w') as json_file:
             json.dump(cpg_hash, json_file)

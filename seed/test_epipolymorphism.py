@@ -82,3 +82,6 @@ class TestGetQuartets(unittest.TestCase):
     def test_cpg_off_by_one(self):
         self.generic_compare('cpg_off_by_one')
 
+    def test_needs_sorted_cpgs(self):
+        self.generic_compare('needs_sorted_cpgs')
+
