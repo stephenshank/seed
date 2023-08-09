@@ -108,35 +108,51 @@ def merge_quartets(all_quartets, quartets):
             }
 
 
+all_methylation = list(
+    it.product((False, True), (False, True), (False, True), (False, True))
+)
+
+
+def get_methylation_counts(quartets_at_position):
+    row = []
+    for methylation in all_methylation:
+        if methylation in quartets_at_position:
+            row.append(quartets_at_position[methylation])
+        else:
+            row.append(0)
+    count = sum(row)
+    freqs = [ x / count for x in row ]
+    epipolymorphism = 1 - sum([f**2 for f in freqs])
+    return row + [count] + freqs + [epipolymorphism]
+
+
+def stringify(row):
+    return [str(i) for i in row]
+
+
 def write_quartets(chromosome, all_quartets, output_tsv_file):
-    all_methylation = list(
-        it.product((False, True), (False, True), (False, True), (False, True))
-    )
     for position in all_quartets.keys(): 
-        row_start = [chromosome] + [str(i) for i in position]
-        row_end = []
-        for methylation in all_methylation:
-            if methylation in all_quartets[position]:
-                row_end.append(str(all_quartets[position][methylation]))
-            else:
-                row_end.append('0')
-        output_tsv_file.write('\t'.join(row_start + row_end) + '\n')
+        row_position = [chromosome] + [str(i) for i in position]
+        row_counts = get_methylation_counts(all_quartets[position])
+        output_tsv_file.write('\t'.join(sum([
+            stringify(row)
+            for row in [row_position, row_counts]
+        ], [])) + '\n')
 
 
 def run_epipolymorphism(input_bam, input_cpgs, output_tsv_path, loglevel=0):
     bam = pysam.AlignmentFile(input_bam, 'rb')
     output_tsv_file = open(output_tsv_path, 'w')
-    all_methylation = list(
-        it.product((False, True), (False, True), (False, True), (False, True))
-    )
-    header = '\t'.join([
-        'chromosome', 'cpg1_0', 'cpg2_0', 'cpg3_0', 'cpg4_0'
-    ] + [
+    counts_header = [
         ''.join([
             'Z' if meth_base else 'z' for meth_base in methylation
         ])
         for methylation in all_methylation
-    ]) + '\n'
+    ]
+    freqs_header = [count_header + '_freq' for count_header in counts_header]
+    header = '\t'.join([
+        'chromosome', 'cpg1_0', 'cpg2_0', 'cpg3_0', 'cpg4_0'
+    ] + counts_header + ['count'] + freqs_header + ['epipolymorphism']) + '\n'
     output_tsv_file.write(header)
     cpgs = load_cpgs(input_cpgs)
     all_quartets = {}
@@ -145,6 +161,8 @@ def run_epipolymorphism(input_bam, input_cpgs, output_tsv_path, loglevel=0):
     previous_chromosome = None
     for read in bam.fetch():
         chromosome = read.reference_name
+        if previous_chromosome == None:
+            previous_chromosome = chromosome
         if loglevel > 0:
             print_relevant_read_info(read)
         quartets = get_quartets(read, cpgs)
