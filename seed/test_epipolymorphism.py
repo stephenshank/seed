@@ -61,20 +61,24 @@ class TestGetQuartets(unittest.TestCase):
     def setUpClass(cls):
         cls.cpgs = load_cpgs('scratch/bismark_CpG.txt')
 
-    def generic_read_test(self, key):
+    def generic_compare(self, key):
         read = MockRead(key)        
         quartets = get_quartets(read, self.cpgs)
         expected_quartets = mock_quartet_hash[key]
         self.assertEqual(quartets, expected_quartets)
 
     def test_simple(self):
-        self.generic_read_test('simple')
+        self.generic_compare('simple')
 
     def test_insertion(self):
-        self.generic_read_test('insertion')
+        self.generic_compare('insertion')
 
     def test_deletion(self):
-        self.generic_read_test('deletion')
+        self.generic_compare('deletion')
 
     def test_no_quartets(self):
-        self.generic_read_test('no_quartets')
+        self.generic_compare('no_quartets')
+
+    def test_cpg_off_by_one(self):
+        self.generic_compare('cpg_off_by_one')
+
