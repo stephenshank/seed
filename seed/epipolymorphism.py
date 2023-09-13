@@ -38,7 +38,8 @@ def print_header():
         'xm_tag',
         'cigartuples',
         'reference_end',
-        'is_forward'
+        'is_forward',
+        'mapping_quality'
     ]))
 
 
@@ -51,12 +52,15 @@ def print_relevant_read_info(read):
             read.get_tag('XM'),
             read.cigartuples,
             read.reference_end,
-            read.is_forward
+            read.is_forward,
+            read.mapping_quality
         ]
     ]))
 
 
-def get_quartets(read, cpgs):
+def get_quartets(read, cpgs, mapping_quality=30):
+    if read.mapping_quality < mapping_quality:
+        return None
     strand = 'F' if read.is_forward else 'R'
     cpgs_on_chromosome = cpgs[read.reference_name][strand]
     cpg_start = bisect_left(cpgs_on_chromosome, read.reference_start)
@@ -94,6 +98,8 @@ def get_quartets(read, cpgs):
 
 
 def merge_quartets(all_quartets, quartets):
+    if quartets is None:
+        return
     for quartet in quartets:
         positions = quartet[:4]
         methylation = quartet[4:]
@@ -113,7 +119,7 @@ all_methylation = list(
 )
 
 
-def get_methylation_counts(quartets_at_position):
+def get_methylation_counts(quartets_at_position, minimum_count=10):
     row = []
     for methylation in all_methylation:
         if methylation in quartets_at_position:
@@ -121,6 +127,8 @@ def get_methylation_counts(quartets_at_position):
         else:
             row.append(0)
     count = sum(row)
+    if count < minimum_count:
+        return None
     freqs = [ x / count for x in row ]
     epipolymorphism = 1 - sum([f**2 for f in freqs])
     return row + [count] + freqs + [epipolymorphism]
@@ -131,16 +139,22 @@ def stringify(row):
 
 
 def write_quartets(chromosome, all_quartets, output_tsv_file):
-    for position in all_quartets.keys(): 
+    positions = sorted(
+        all_quartets.keys(),
+        key=lambda x: x[0]
+    )
+    for position in positions:
         row_position = [chromosome] + [str(i) for i in position]
         row_counts = get_methylation_counts(all_quartets[position])
-        output_tsv_file.write('\t'.join(sum([
-            stringify(row)
-            for row in [row_position, row_counts]
-        ], [])) + '\n')
+        if not row_counts is None:
+            output_tsv_file.write('\t'.join(sum([
+                stringify(row)
+                for row in [row_position, row_counts]
+            ], [])) + '\n')
 
 
-def run_epipolymorphism(input_bam, input_cpgs, output_tsv_path, loglevel=0):
+def run_epipolymorphism(input_bam, input_cpgs, output_tsv_path,
+        output_quartets=None, loglevel=0):
     bam = pysam.AlignmentFile(input_bam, 'rb')
     output_tsv_file = open(output_tsv_path, 'w')
     counts_header = [
