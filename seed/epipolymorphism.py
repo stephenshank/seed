@@ -62,7 +62,12 @@ def get_quartets(read, cpgs, mapping_quality=30):
     if read.mapping_quality < mapping_quality:
         return None
     strand = 'F' if read.is_forward else 'R'
-    cpgs_on_chromosome = cpgs[read.reference_name][strand]
+    try:
+        cpgs_on_chromosome = cpgs[read.reference_name][strand]
+    except KeyError:
+        error_message = 'warning: key error with %s' % read.reference_name
+        print(error_message, file=sys.stderr)
+        return None
     cpg_start = bisect_left(cpgs_on_chromosome, read.reference_start)
     cpg_end = bisect_right(cpgs_on_chromosome, read.reference_end-1)
     bases = [
