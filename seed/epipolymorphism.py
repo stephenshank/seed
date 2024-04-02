@@ -152,10 +152,11 @@ def write_quartets(chromosome, all_quartets, output_tsv_file):
         row_position = [chromosome] + [str(i) for i in position]
         row_counts = get_methylation_counts(all_quartets[position])
         if not row_counts is None:
-            output_tsv_file.write('\t'.join(sum([
+            output = sum([
                 stringify(row)
                 for row in [row_position, row_counts]
-            ], [])) + '\n')
+            ], [])
+            output_tsv_file.write('\t'.join(output) + '\n')
 
 
 def run_epipolymorphism(input_bam, input_cpgs, output_tsv_path,
@@ -187,7 +188,7 @@ def run_epipolymorphism(input_bam, input_cpgs, output_tsv_path,
         quartets = get_quartets(read, cpgs)
         merge_quartets(all_quartets, quartets)
         if previous_chromosome != chromosome:
-            write_quartets(chromosome, all_quartets, output_tsv_file)
+            write_quartets(previous_chromosome, all_quartets, output_tsv_file)
             all_quartets = {}
         previous_chromosome = chromosome
     write_quartets(chromosome, all_quartets, output_tsv_file)
