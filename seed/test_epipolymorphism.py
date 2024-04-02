@@ -44,6 +44,7 @@ class MockRead:
         self.cigartuples = mock_read['cigartuples']
         self.reference_name = mock_read['reference_name']
         self.is_forward = mock_read['is_forward']
+        self.mapping_quality = 40
 
     def get_tag(self, tag='XM'):
         return self.xm_tag
